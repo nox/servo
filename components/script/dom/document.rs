@@ -59,6 +59,7 @@ use dom::mouseevent::MouseEvent;
 use dom::node::{self, Node, NodeTypeId, CloneChildrenFlag, NodeDamage, window_from_node};
 use dom::nodeiterator::NodeIterator;
 use dom::nodelist::NodeList;
+use dom::stylesheetlist::StyleSheetList;
 use dom::processinginstruction::ProcessingInstruction;
 use dom::range::Range;
 use dom::servohtmlparser::ServoHTMLParser;
@@ -127,6 +128,7 @@ pub struct Document {
     scripts: MutNullableHeap<JS<HTMLCollection>>,
     anchors: MutNullableHeap<JS<HTMLCollection>>,
     applets: MutNullableHeap<JS<HTMLCollection>>,
+    stylesheets: MutNullableHeap<JS<StyleSheetList>>,
     ready_state: Cell<DocumentReadyState>,
     /// The element that has most recently requested focus for itself.
     possibly_focused: MutNullableHeap<JS<Element>>,
@@ -843,6 +845,10 @@ impl Document {
         }
     }
 
+    pub fn stylesheets(&self) -> Option<Root<StyleSheetList>> {
+        self.stylesheets.get().as_ref().map(JS::root)
+    }
+
     pub fn get_body_attribute(&self, local_name: &Atom) -> DOMString {
         match self.GetBody().and_then(HTMLBodyElementCast::to_root) {
             Some(ref body) => {
@@ -1054,6 +1060,7 @@ impl Document {
             scripts: Default::default(),
             anchors: Default::default(),
             applets: Default::default(),
+            stylesheets: Default::default(),
             ready_state: Cell::new(ready_state),
             possibly_focused: Default::default(),
             focused: Default::default(),
@@ -1663,6 +1670,14 @@ impl DocumentMethods for Document {
             let root = NodeCast::from_ref(self);
             let filter = box AppletsFilter;
             HTMLCollection::create(window.r(), root, filter)
+        })
+    }
+
+    // https://drafts.csswg.org/cssom/#dom-document-stylesheets
+    fn StyleSheets(&self) -> Root<StyleSheetList> {
+        self.stylesheets.or_init(|| {
+            let window = self.window.root();
+            StyleSheetList::new(window.r(), NodeCast::from_ref(self))
         })
     }
 

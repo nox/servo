@@ -159,3 +159,13 @@ partial interface Document {
   // Tracking issue for document.all: https://github.com/servo/servo/issues/7396
   // readonly attribute HTMLAllCollection all;
 };
+
+// https://drafts.csswg.org/cssom/#extensions-to-the-document-interface
+partial interface Document {
+  [SameObject] readonly attribute StyleSheetList styleSheets;
+  // attribute DOMString? selectedStyleSheetSet;
+  // readonly attribute DOMString? lastStyleSheetSet;
+  // readonly attribute DOMString? preferredStyleSheetSet;
+  // readonly attribute DOMString[] styleSheetSets;
+  // void enableStyleSheetsForSet(DOMString? name);
+};
