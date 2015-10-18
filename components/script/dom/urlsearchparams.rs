@@ -12,6 +12,8 @@ use dom::bindings::global::GlobalRef;
 use dom::bindings::js::Root;
 use dom::bindings::reflector::{Reflector, reflect_dom_object};
 use dom::bindings::str::USVString;
+use dom::bindings::weakref::MutableWeakRef;
+use dom::url::URL;
 use encoding::types::EncodingRef;
 use url::form_urlencoded::{parse, serialize_with_encoding};
 use util::str::DOMString;
@@ -22,39 +24,47 @@ pub struct URLSearchParams {
     reflector_: Reflector,
     // https://url.spec.whatwg.org/#concept-urlsearchparams-list
     list: DOMRefCell<Vec<(String, String)>>,
+    // https://url.spec.whatwg.org/#concept-urlsearchparams-url-object
+    url: MutableWeakRef<URL>,
 }
 
 impl URLSearchParams {
-    fn new_inherited() -> URLSearchParams {
+    fn new_inherited(url: Option<&URL>, list: Vec<(String, String)>)
+                     -> URLSearchParams {
         URLSearchParams {
             reflector_: Reflector::new(),
-            list: DOMRefCell::new(vec![]),
+            list: DOMRefCell::new(list),
+            url: MutableWeakRef::new(url),
         }
     }
 
-    pub fn new(global: GlobalRef) -> Root<URLSearchParams> {
-        reflect_dom_object(box URLSearchParams::new_inherited(), global,
+    pub fn new(global: GlobalRef, url: Option<&URL>, list: Vec<(String, String)>)
+               -> Root<URLSearchParams> {
+        reflect_dom_object(box URLSearchParams::new_inherited(url, list), global,
                            URLSearchParamsBinding::Wrap)
+    }
+
+    pub fn set_list(&self, list: Vec<(String, String)>) {
+        *self.list.borrow_mut() = list;
     }
 
     // https://url.spec.whatwg.org/#dom-urlsearchparams-urlsearchparams
     pub fn Constructor(global: GlobalRef, init: Option<USVStringOrURLSearchParams>) ->
                        Fallible<Root<URLSearchParams>> {
-        // Step 1.
-        let query = URLSearchParams::new(global);
         match init {
             Some(eUSVString(init)) => {
                 // Step 2.
-                *query.list.borrow_mut() = parse(init.0.as_bytes());
+                Ok(URLSearchParams::new(global, None, parse(init.0.as_bytes())))
             },
             Some(eURLSearchParams(init)) => {
                 // Step 3.
-                *query.list.borrow_mut() = init.list.borrow().clone();
+                Ok(URLSearchParams::new(global, None, init.list.borrow().clone()))
             },
-            None => {}
+            None => {
+                // Step 4.
+                Ok(URLSearchParams::new(global, None, vec![]))
+            }
         }
-        // Step 4.
-        Ok(query)
     }
 }
 
@@ -130,12 +140,11 @@ impl URLSearchParams {
         let list = self.list.borrow();
         serialize_with_encoding(list.iter(), encoding)
     }
-}
 
-
-impl URLSearchParams {
     // https://url.spec.whatwg.org/#concept-uq-update
     fn update_steps(&self) {
-        // XXXManishearth Implement this when the URL interface is implemented
+        if let Some(url) = self.url.root() {
+            url.set_query(self.serialize(None));
+        }
     }
 }

@@ -5,13 +5,15 @@
 use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::URLBinding::{self, URLMethods};
 use dom::bindings::error::{Error, ErrorResult, Fallible};
-use dom::bindings::global::GlobalRef;
-use dom::bindings::js::Root;
+use dom::bindings::global::{GlobalRef, global_root_from_reflector};
+use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::bindings::reflector::{Reflector, reflect_dom_object};
 use dom::bindings::str::USVString;
 use dom::urlhelper::UrlHelper;
+use dom::urlsearchparams::URLSearchParams;
 use std::borrow::ToOwned;
 use url::{Host, ParseResult, Url, UrlParser};
+use url::form_urlencoded::parse;
 use util::str::DOMString;
 
 // https://url.spec.whatwg.org/#url
@@ -24,6 +26,9 @@ pub struct URL {
 
     // https://url.spec.whatwg.org/#concept-urlutils-get-the-base
     base: Option<Url>,
+
+    // https://url.spec.whatwg.org/#concept-url-query-object
+    params: MutNullableHeap<JS<URLSearchParams>>,
 }
 
 impl URL {
@@ -32,12 +37,21 @@ impl URL {
             reflector_: Reflector::new(),
             url: DOMRefCell::new(url),
             base: base,
+            params: MutNullableHeap::new(None),
         }
     }
 
     pub fn new(global: GlobalRef, url: Url, base: Option<Url>) -> Root<URL> {
         reflect_dom_object(box URL::new_inherited(url, base),
                            global, URLBinding::Wrap)
+    }
+
+    fn params_list(&self) -> Vec<(String, String)> {
+        self.url.borrow().query.as_ref().map_or(vec![], |query| parse(query.as_bytes()))
+    }
+
+    pub fn set_query(&self, query: String) {
+        self.url.borrow_mut().query = Some(query);
     }
 }
 
@@ -184,6 +198,17 @@ impl URLMethods for URL {
     // https://url.spec.whatwg.org/#dom-url-search
     fn SetSearch(&self, value: USVString) {
         UrlHelper::SetSearch(&mut self.url.borrow_mut(), value);
+        if let Some(params) = self.params.get() {
+            params.set_list(self.params_list());
+        }
+    }
+
+    // https://url.spec.whatwg.org/#dom-url-searchparams
+    fn SearchParams(&self) -> Root<URLSearchParams> {
+        self.params.or_init(|| {
+            let global = global_root_from_reflector(self);
+            URLSearchParams::new(global.r(), Some(self), self.params_list())
+        })
     }
 
     // https://url.spec.whatwg.org/#dom-url-href
