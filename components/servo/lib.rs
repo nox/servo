@@ -84,7 +84,7 @@ use profile_traits::time;
 use std::borrow::Borrow;
 use std::rc::Rc;
 use std::sync::mpsc::Sender;
-use util::opts;
+use util::opts::{self, RenderApi};
 use util::resource_files::resources_dir_path;
 
 pub use _util as util;
@@ -151,7 +151,7 @@ impl Browser {
             devtools::start_server(port)
         });
 
-        let (webrender, webrender_api_sender) = if opts::get().use_webrender {
+        let (webrender, webrender_api_sender) = if opts::get().render_api == RenderApi::WebRender {
             let mut resource_path = resources_dir_path();
             resource_path.push("shaders");
 

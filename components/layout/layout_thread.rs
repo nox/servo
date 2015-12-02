@@ -77,7 +77,7 @@ use traversal::RecalcStyleAndConstructFlows;
 use url::Url;
 use util::geometry::MAX_RECT;
 use util::ipc::OptionalIpcSender;
-use util::opts;
+use util::opts::{self, RenderApi};
 use util::thread;
 use util::thread_state;
 use util::workqueue::WorkQueue;
@@ -911,7 +911,7 @@ impl LayoutThread {
 
                 self.epoch.next();
 
-                if opts::get().use_webrender {
+                if opts::get().render_api == RenderApi::WebRender {
                     let api = self.webrender_api.as_ref().unwrap();
                     // TODO: Avoid the temporary conversion and build webrender sc/dl directly!
                     let Epoch(epoch_number) = self.epoch;

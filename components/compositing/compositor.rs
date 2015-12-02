@@ -49,7 +49,7 @@ use time::{precise_time_ns, precise_time_s};
 use touch::{TouchHandler, TouchAction};
 use url::Url;
 use util::geometry::{PagePx, ScreenPx, ViewportPx};
-use util::opts;
+use util::opts::{self, RenderApi};
 use util::print_tree::PrintTree;
 use webrender;
 use webrender_traits;
@@ -302,7 +302,7 @@ fn initialize_png(width: usize, height: usize) -> RenderTargetInfo {
 
     gl::bind_texture(gl::TEXTURE_2D, 0);
 
-    let renderbuffer_ids = if opts::get().use_webrender {
+    let renderbuffer_ids = if opts::get().render_api == RenderApi::WebRender {
         let renderbuffer_ids = gl::gen_renderbuffers(1);
         gl::bind_renderbuffer(gl::RENDERBUFFER, renderbuffer_ids[0]);
         gl::renderbuffer_storage(gl::RENDERBUFFER,
@@ -2026,7 +2026,7 @@ impl<Window: WindowMethods> IOCompositor<Window> {
 
         gl::delete_buffers(&render_target_info.texture_ids);
         gl::delete_frame_buffers(&render_target_info.framebuffer_ids);
-        if opts::get().use_webrender  {
+        if opts::get().render_api == RenderApi::WebRender {
             gl::delete_renderbuffers(&render_target_info.renderbuffer_ids);
         }
 

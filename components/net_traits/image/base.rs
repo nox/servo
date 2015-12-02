@@ -5,7 +5,7 @@
 use ipc_channel::ipc::IpcSharedMemory;
 use piston_image::{self, DynamicImage, GenericImage, ImageFormat};
 use stb_image::image as stb_image2;
-use util::opts;
+use util::opts::{self, RenderApi};
 use util::vec::byte_swap;
 
 pub use msg::constellation_msg::{Image, ImageMetadata, PixelFormat};
@@ -18,7 +18,7 @@ fn byte_swap_and_premultiply(data: &mut [u8]) {
     let length = data.len();
 
     // No need to pre-multiply alpha when using direct GPU rendering.
-    let premultiply_alpha = !opts::get().use_webrender;
+    let premultiply_alpha = opts::get().render_api != RenderApi::WebRender;
 
     for i in (0..length).step_by(4) {
         let r = data[i + 2];

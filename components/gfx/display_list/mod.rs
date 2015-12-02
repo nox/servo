@@ -43,7 +43,7 @@ use text::TextRun;
 use text::glyph::CharIndex;
 use util::geometry::MAX_RECT;
 use util::linked_list::prepend_from;
-use util::opts;
+use util::opts::{self, RenderApi};
 use util::print_tree::PrintTree;
 use webrender_traits::WebGLContextId;
 
@@ -643,7 +643,7 @@ impl StackingContext {
             last_child_layer_info: None,
         };
         // webrender doesn't care about layers in the display list - it's handled internally.
-        if !opts::get().use_webrender {
+        if opts::get().render_api != RenderApi::WebRender {
             StackingContextLayerCreator::add_layers_to_preserve_drawing_order(&mut stacking_context);
         }
         stacking_context
@@ -686,7 +686,7 @@ impl StackingContext {
         // on 3d transformed tiles. We should have a better solution
         // than just disabling the opts here.
         if paint_context.layer_kind == LayerKind::HasTransform ||
-           opts::get().use_webrender {      // webrender takes care of all culling via aabb tree!
+           opts::get().render_api == RenderApi::WebRender {      // webrender takes care of all culling via aabb tree!
             self.draw_into_context(&self.display_list,
                                    paint_context,
                                    &transform,
@@ -781,7 +781,7 @@ struct StackingContextLayerCreator {
 impl StackingContextLayerCreator {
     fn new() -> StackingContextLayerCreator {
         // webrender doesn't care about layers in the display list - it's handled internally.
-        debug_assert!(!opts::get().use_webrender);
+        debug_assert!(opts::get().render_api != RenderApi::WebRender);
 
         StackingContextLayerCreator {
             display_list_for_next_layer: None,

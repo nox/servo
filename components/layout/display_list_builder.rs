@@ -57,7 +57,7 @@ use style::values::specified::{AngleOrCorner, HorizontalDirection, VerticalDirec
 use style_traits::cursor::Cursor;
 use table_cell::CollapsedBordersForCell;
 use url::Url;
-use util::opts;
+use util::opts::{self, RenderApi};
 
 /// The logical width of an insertion point: at the moment, a one-pixel-wide line.
 const INSERTION_POINT_LOGICAL_WIDTH: Au = Au(1 * AU_PER_PX);
@@ -948,7 +948,7 @@ impl FragmentDisplayListBuilding for Fragment {
                self);
 
         // webrender deals with all culling via aabb
-        if !opts::get().use_webrender {
+        if opts::get().render_api != RenderApi::WebRender {
             if !stacking_relative_border_box.intersects(stacking_relative_display_port) {
                 debug!("Fragment::build_display_list: outside display port");
                 return
@@ -1114,7 +1114,7 @@ impl FragmentDisplayListBuilding for Fragment {
             }
             SpecificFragmentInfo::Iframe(ref fragment_info) => {
                 if !stacking_relative_content_box.is_empty() {
-                    if opts::get().use_webrender {
+                    if opts::get().render_api == RenderApi::WebRender {
                         display_list.content.push_back(DisplayItem::IframeClass(box IframeDisplayItem {
                             base: BaseDisplayItem::new(&stacking_relative_content_box,
                                                        DisplayItemMetadata::new(self.node,
@@ -1214,7 +1214,7 @@ impl FragmentDisplayListBuilding for Fragment {
                         }
                     };
 
-                    if opts::get().use_webrender {
+                    if opts::get().render_api == RenderApi::WebRender {
                         display_list.content.push_back(display_item);
                     } else {
                         display_list.content.push_back(DisplayItem::LayeredItemClass(box LayeredItem {

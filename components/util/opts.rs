@@ -181,14 +181,14 @@ pub struct Opts {
     /// Enable vsync in the compositor
     pub enable_vsync: bool,
 
-    /// True to enable the webrender painting/compositing backend.
-    pub use_webrender: bool,
-
     /// True to show webrender profiling stats on screen.
     pub webrender_stats: bool,
 
     /// True if WebRender should use multisample antialiasing.
     pub use_msaa: bool,
+
+    // Which rendering API to use.
+    pub render_api: RenderApi,
 }
 
 fn print_usage(app: &str, opts: &Options) {
@@ -400,6 +400,15 @@ enum UserAgent {
     Gonk,
 }
 
+#[derive(Clone, Debug, Eq, Deserialize, PartialEq, Serialize)]
+pub enum RenderApi {
+    GL,
+    ES2,
+    WebRender,
+}
+
+const DEFAULT_RENDER_API: RenderApi = RenderApi::GL;
+
 fn default_user_agent_string(agent: UserAgent) -> String {
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     const DESKTOP_UA_STRING: &'static str =
@@ -494,9 +503,9 @@ pub fn default_opts() -> Opts {
         exit_after_load: false,
         no_native_titlebar: false,
         enable_vsync: true,
-        use_webrender: false,
         webrender_stats: false,
         use_msaa: false,
+        render_api: DEFAULT_RENDER_API,
     }
 }
 
@@ -541,6 +550,7 @@ pub fn from_cmdline_args(args: &[String]) -> ArgumentParsingResult {
                   "A preference to set to enable", "dom.mozbrowser.enabled");
     opts.optflag("b", "no-native-titlebar", "Do not use native titlebar");
     opts.optflag("w", "webrender", "Use webrender backend");
+    opts.optflagopt("G", "graphics", "Select graphics backend (GL or ES2)", "GL");
 
     let opt_match = match opts.parse(args) {
         Ok(m) => m,
@@ -685,6 +695,14 @@ pub fn from_cmdline_args(args: &[String]) -> ArgumentParsingResult {
 
     let use_webrender = opt_match.opt_present("w") && !opt_match.opt_present("z");
 
+    let render_api = match opt_match.opt_str("G") {
+        Some(ref ga) if ga == "gl" => RenderApi::GL,
+        Some(ref ga) if ga == "es2" => RenderApi::ES2,
+        Some(ref ga) if ga == "webrender" && !opt_match.opt_present("z") => RenderApi::WebRender,
+        Some(ga) =>  args_fail(&format!("error: graphics option should be gl, es2 or webrender:")),
+        None => if use_webrender { RenderApi::WebRender } else { RenderApi::GL },
+    };
+
     let opts = Opts {
         is_running_problem_test: is_running_problem_test,
         url: Some(url),
@@ -714,6 +732,7 @@ pub fn from_cmdline_args(args: &[String]) -> ArgumentParsingResult {
         user_agent: user_agent,
         multiprocess: opt_match.opt_present("M"),
         sandbox: opt_match.opt_present("S"),
+        render_api: render_api,
         show_debug_borders: debug_options.show_compositor_borders,
         show_debug_fragment_borders: debug_options.show_fragment_borders,
         show_debug_parallel_paint: debug_options.show_parallel_paint,
@@ -733,7 +752,6 @@ pub fn from_cmdline_args(args: &[String]) -> ArgumentParsingResult {
         exit_after_load: opt_match.opt_present("x"),
         no_native_titlebar: opt_match.opt_present("b"),
         enable_vsync: !debug_options.disable_vsync,
-        use_webrender: use_webrender,
         webrender_stats: debug_options.webrender_stats,
         use_msaa: debug_options.use_msaa,
     };
