@@ -18,14 +18,14 @@ tinyfiledialogs = {git = "https://github.com/jdm/tinyfiledialogs"}
 
 [dependencies]
 angle = {git = "https://github.com/servo/angle", branch = "servo"}
-app_units = {version = "0.2.3", features = ["plugins"]}
+app_units = "0.2.5"
 bitflags = "0.7"
 canvas_traits = {path = "../canvas_traits"}
 caseless = "0.1.0"
 cssparser = {version = "0.5.4", features = ["heap_size", "serde-serialization"]}
 devtools_traits = {path = "../devtools_traits"}
 encoding = "0.2"
-euclid = {version = "0.6.4", features = ["plugins"]}
+euclid = "0.7.1"
 fnv = "1.0"
 gfx_traits = {path = "../gfx_traits"}
 heapsize = "0.3.6"
@@ -57,7 +57,7 @@ rustc-serialize = "0.3"
 script_layout_interface = {path = "../script_layout_interface"}
 script_traits = {path = "../script_traits"}
 selectors = {version = "0.6", features = ["heap_size"]}
-serde = "0.7"
+serde = "0.7.11"
 smallvec = "0.1"
 string_cache = {version = "0.2.20", features = ["heap_size", "unstable"]}
 style = {path = "../style"}

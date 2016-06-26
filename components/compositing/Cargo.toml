@@ -9,9 +9,9 @@ name = "compositing"
 path = "lib.rs"
 
 [dependencies]
-app_units = {version = "0.2.3", features = ["plugins"]}
+app_units = "0.2.5"
 azure = {git = "https://github.com/servo/rust-azure", features = ["plugins"]}
-euclid = {version = "0.6.4", features = ["plugins"]}
+euclid = "0.7.1"
 gfx = {path = "../gfx"}
 gfx_traits = {path = "../gfx_traits"}
 gleam = "0.2.8"
@@ -24,8 +24,8 @@ net_traits = {path = "../net_traits"}
 plugins = {path = "../plugins"}
 profile_traits = {path = "../profile_traits"}
 script_traits = {path = "../script_traits"}
-serde = "0.7"
-serde_macros = "0.7"
+serde = "0.7.11"
+serde_macros = "0.7.11"
 style_traits = {path = "../style_traits"}
 time = "0.1.17"
 url = {version = "1.0.0", features = ["heap_size"]}
