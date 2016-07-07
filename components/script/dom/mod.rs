@@ -342,6 +342,7 @@ pub mod htmlulistelement;
 pub mod htmlunknownelement;
 pub mod htmlvideoelement;
 pub mod idbfactory;
+pub mod idbrequest;
 pub mod imagedata;
 pub mod keyboardevent;
 pub mod location;
