@@ -100,6 +100,7 @@ use std::sync::mpsc::{Receiver, Select, Sender, channel};
 use std::sync::{Arc, Mutex};
 use style::context::ReflowGoal;
 use task_source::TaskSource;
+use task_source::database_access::{DatabaseAccessTask, DatabaseAccessTaskSource};
 use task_source::dom_manipulation::{DOMManipulationTaskSource, DOMManipulationTask};
 use task_source::file_reading::FileReadingTaskSource;
 use task_source::history_traversal::HistoryTraversalTaskSource;
@@ -226,6 +227,8 @@ pub enum MainThreadScriptMsg {
     /// Begins a content-initiated load on the specified pipeline (only
     /// dispatched to ScriptThread).
     Navigate(PipelineId, LoadData),
+    /// Tasks that originate from the database access task source.
+    DatabaseAccess(DatabaseAccessTask),
     /// Tasks that originate from the DOM manipulation task source
     DOMManipulation(DOMManipulationTask),
     /// Tasks that originate from the user interaction task source
@@ -341,6 +344,8 @@ pub struct ScriptThread {
 
     /// The port which receives a sender from the network
     custom_message_port: Receiver<CustomResponseSender>,
+
+    database_access_task_source: DatabaseAccessTaskSource,
 
     dom_manipulation_task_source: DOMManipulationTaskSource,
 
@@ -586,6 +591,7 @@ impl ScriptThread {
             custom_message_port: custom_msg_port,
 
             chan: MainThreadScriptChan(chan.clone()),
+            database_access_task_source: DatabaseAccessTaskSource(chan.clone()),
             dom_manipulation_task_source: DOMManipulationTaskSource(chan.clone()),
             user_interaction_task_source: UserInteractionTaskSource(chan.clone()),
             networking_task_source: NetworkingTaskSource(chan.clone()),
@@ -979,6 +985,8 @@ impl ScriptThread {
                 LiveDOMReferences::cleanup(addr),
             MainThreadScriptMsg::Common(CommonScriptMsg::CollectReports(reports_chan)) =>
                 self.collect_reports(reports_chan),
+            MainThreadScriptMsg::DatabaseAccess(task) =>
+                task.handle_task(self),
             MainThreadScriptMsg::DOMManipulation(task) =>
                 task.handle_task(self),
             MainThreadScriptMsg::UserInteraction(task) =>
@@ -1575,6 +1583,7 @@ impl ScriptThread {
         });
 
         let MainThreadScriptChan(ref sender) = self.chan;
+        let DatabaseAccessTaskSource(ref db_sender) = self.database_access_task_source;
         let DOMManipulationTaskSource(ref dom_sender) = self.dom_manipulation_task_source;
         let UserInteractionTaskSource(ref user_sender) = self.user_interaction_task_source;
         let NetworkingTaskSource(ref network_sender) = self.networking_task_source;
@@ -1588,6 +1597,7 @@ impl ScriptThread {
         // Create the window and document objects.
         let window = Window::new(self.js_runtime.clone(),
                                  MainThreadScriptChan(sender.clone()),
+                                 DatabaseAccessTaskSource(db_sender.clone()),
                                  DOMManipulationTaskSource(dom_sender.clone()),
                                  UserInteractionTaskSource(user_sender.clone()),
                                  NetworkingTaskSource(network_sender.clone()),

@@ -83,6 +83,7 @@ use style::error_reporting::ParseErrorReporter;
 use style::properties::longhands::overflow_x;
 use style::selector_impl::PseudoElement;
 use style::str::HTML_SPACE_CHARACTERS;
+use task_source::database_access::DatabaseAccessTaskSource;
 use task_source::dom_manipulation::DOMManipulationTaskSource;
 use task_source::file_reading::FileReadingTaskSource;
 use task_source::history_traversal::HistoryTraversalTaskSource;
@@ -136,6 +137,8 @@ pub struct Window {
     eventtarget: EventTarget,
     #[ignore_heap_size_of = "trait objects are hard"]
     script_chan: MainThreadScriptChan,
+    #[ignore_heap_size_of = "task sources are hard"]
+    database_access_task_source: DatabaseAccessTaskSource,
     #[ignore_heap_size_of = "task sources are hard"]
     dom_manipulation_task_source: DOMManipulationTaskSource,
     #[ignore_heap_size_of = "task sources are hard"]
@@ -284,6 +287,10 @@ impl Window {
 
     pub fn get_cx(&self) -> *mut JSContext {
         self.js_runtime.borrow().as_ref().unwrap().cx()
+    }
+
+    pub fn database_access_task_source(&self) -> DatabaseAccessTaskSource {
+        self.database_access_task_source.clone()
     }
 
     pub fn dom_manipulation_task_source(&self) -> DOMManipulationTaskSource {
@@ -1604,6 +1611,7 @@ impl Window {
 impl Window {
     pub fn new(runtime: Rc<Runtime>,
                script_chan: MainThreadScriptChan,
+               db_task_source: DatabaseAccessTaskSource,
                dom_task_source: DOMManipulationTaskSource,
                user_task_source: UserInteractionTaskSource,
                network_task_source: NetworkingTaskSource,
@@ -1640,6 +1648,7 @@ impl Window {
         let win = box Window {
             eventtarget: EventTarget::new_inherited(),
             script_chan: script_chan,
+            database_access_task_source: db_task_source,
             dom_manipulation_task_source: dom_task_source,
             user_interaction_task_source: user_task_source,
             networking_task_source: network_task_source,

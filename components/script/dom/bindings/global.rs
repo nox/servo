@@ -25,6 +25,7 @@ use profile_traits::{mem, time};
 use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort};
 use script_thread::{MainThreadScriptChan, ScriptThread};
 use script_traits::{MsDuration, ScriptMsg as ConstellationMsg, TimerEventRequest};
+use task_source::database_access::DatabaseAccessTaskSource;
 use task_source::dom_manipulation::DOMManipulationTaskSource;
 use timers::{OneshotTimerCallback, OneshotTimerHandle};
 use url::Url;
@@ -187,6 +188,14 @@ impl<'a> GlobalRef<'a> {
             GlobalRef::Window(ref window) =>
                 MainThreadScriptChan(window.main_thread_script_chan().clone()).clone(),
             GlobalRef::Worker(ref worker) => worker.script_chan(),
+        }
+    }
+
+    /// The database access task source.
+    pub fn database_access_task_source(&self) -> DatabaseAccessTaskSource {
+        match *self {
+            GlobalRef::Window(ref window) => window.database_access_task_source(),
+            GlobalRef::Worker(_) => unimplemented!(),
         }
     }
 
