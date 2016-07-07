@@ -32,6 +32,7 @@ use msg::constellation_msg::{self, PanicMsg};
 use net_traits::bluetooth_thread::BluetoothMethodMsg;
 use net_traits::filemanager_thread::FileManagerThreadMsg;
 use net_traits::image_cache_thread::ImageCacheThread;
+use net_traits::indexeddb_thread::IndexedDbThreadMsg;
 use net_traits::storage_thread::StorageThreadMsg;
 use net_traits::{self, ResourceThreads, IpcSend};
 use offscreen_gl_context::{GLContextAttributes, GLLimits};
@@ -858,6 +859,7 @@ impl<Message, LTF, STF> Constellation<Message, LTF, STF>
         // Channels to recieve signals when threads are done exiting.
         let (core_sender, core_receiver) = ipc::channel().expect("Failed to create IPC channel!");
         let (storage_sender, storage_receiver) = ipc::channel().expect("Failed to create IPC channel!");
+        let (indexeddb_sender, indexeddb_receiver) = ipc::channel().expect("Failed to create IPC channel!");
 
         debug!("Exiting image cache.");
         self.image_cache_thread.exit();
@@ -885,6 +887,11 @@ impl<Message, LTF, STF> Constellation<Message, LTF, STF>
             warn!("Exit storage thread failed ({})", e);
         }
 
+        debug!("Exiting indexeddb resource threads.");
+        if let Err(e) = self.public_resource_threads.send(IndexedDbThreadMsg::Exit(indexeddb_sender)) {
+            warn!("Exit indexeddb thread failed ({})", e);
+        }
+
         debug!("Exiting bluetooth thread.");
         if let Err(e) = self.bluetooth_thread.send(BluetoothMethodMsg::Exit) {
             warn!("Exit bluetooth thread failed ({})", e);
@@ -899,6 +906,9 @@ impl<Message, LTF, STF> Constellation<Message, LTF, STF>
         }
         if let Err(e) = storage_receiver.recv() {
             warn!("Exit storage thread failed ({})", e);
+        }
+        if let Err(e) = indexeddb_receiver.recv() {
+            warn!("Exit indexeddb thread failed ({})", e);
         }
 
         debug!("Asking compositor to complete shutdown.");

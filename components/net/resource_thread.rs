@@ -20,11 +20,13 @@ use http_loader::{self, HttpState};
 use hyper::client::pool::Pool;
 use hyper::header::{ContentType, Header, SetCookie};
 use hyper::mime::{Mime, SubLevel, TopLevel};
+use indexeddb_thread::IndexedDbThreadFactory;
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender, IpcReceiverSet};
 use mime_classifier::{ApacheBugFlag, MimeClassifier, NoSniffFlag};
 use net_traits::LoadContext;
 use net_traits::ProgressMsg::Done;
 use net_traits::filemanager_thread::FileManagerThreadMsg;
+use net_traits::indexeddb_thread::IndexedDbThreadMsg;
 use net_traits::request::{Request, RequestInit};
 use net_traits::storage_thread::StorageThreadMsg;
 use net_traits::{AsyncResponseTarget, Metadata, ProgressMsg, ResponseAction, CoreResourceThread};
@@ -176,8 +178,9 @@ pub fn new_resource_threads(user_agent: String,
     let (public_core, private_core) = new_core_resource_thread(user_agent, devtools_chan, profiler_chan);
     let storage: IpcSender<StorageThreadMsg> = StorageThreadFactory::new();
     let filemanager: IpcSender<FileManagerThreadMsg> = FileManagerThreadFactory::new(TFD_PROVIDER);
-    (ResourceThreads::new(public_core, storage.clone(), filemanager.clone()),
-     ResourceThreads::new(private_core, storage, filemanager))
+    let indexeddb: IpcSender<IndexedDbThreadMsg> = IndexedDbThreadFactory::new();
+    (ResourceThreads::new(public_core, storage.clone(), filemanager.clone(), indexeddb.clone()),
+     ResourceThreads::new(private_core, storage, filemanager, indexeddb))
 }
 
 

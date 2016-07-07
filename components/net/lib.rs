@@ -61,6 +61,7 @@ pub mod filemanager_thread;
 pub mod hsts;
 pub mod http_loader;
 pub mod image_cache_thread;
+pub mod indexeddb_thread;
 pub mod mime_classifier;
 pub mod pub_domains;
 pub mod resource_thread;

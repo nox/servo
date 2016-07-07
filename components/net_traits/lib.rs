@@ -37,6 +37,7 @@ use hyper::header::{ContentType, Headers};
 use hyper::http::RawStatus;
 use hyper::method::Method;
 use hyper::mime::{Attr, Mime};
+use indexeddb_thread::IndexedDbThreadMsg;
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use msg::constellation_msg::{PipelineId, ReferrerPolicy};
 use request::{Request, RequestInit};
@@ -53,6 +54,7 @@ pub mod bluetooth_thread;
 pub mod filemanager_thread;
 pub mod hosts;
 pub mod image_cache_thread;
+pub mod indexeddb_thread;
 pub mod net_error_list;
 pub mod request;
 pub mod response;
@@ -329,16 +331,20 @@ pub struct ResourceThreads {
     core_thread: CoreResourceThread,
     storage_thread: IpcSender<StorageThreadMsg>,
     filemanager_thread: IpcSender<FileManagerThreadMsg>,
+    indexeddb_thread: IpcSender<IndexedDbThreadMsg>,
 }
 
 impl ResourceThreads {
     pub fn new(c: CoreResourceThread,
                s: IpcSender<StorageThreadMsg>,
-               f: IpcSender<FileManagerThreadMsg>) -> ResourceThreads {
+               f: IpcSender<FileManagerThreadMsg>,
+               i: IpcSender<IndexedDbThreadMsg>)
+               -> ResourceThreads {
         ResourceThreads {
             core_thread: c,
             storage_thread: s,
             filemanager_thread: f,
+            indexeddb_thread: i,
         }
     }
 }
@@ -370,6 +376,16 @@ impl IpcSend<FileManagerThreadMsg> for ResourceThreads {
 
     fn sender(&self) -> IpcSender<FileManagerThreadMsg> {
         self.filemanager_thread.clone()
+    }
+}
+
+impl IpcSend<IndexedDbThreadMsg> for ResourceThreads {
+    fn send(&self, msg: IndexedDbThreadMsg) -> IpcSendResult {
+        self.indexeddb_thread.send(msg)
+    }
+
+    fn sender(&self) -> IpcSender<IndexedDbThreadMsg> {
+        self.indexeddb_thread.clone()
     }
 }
 
