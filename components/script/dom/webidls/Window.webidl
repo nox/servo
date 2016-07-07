@@ -190,3 +190,6 @@ Window implements WindowLocalStorage;
 
 // http://w3c.github.io/animation-timing/#framerequestcallback
 callback FrameRequestCallback = void (DOMHighResTimeStamp time);
+
+// https://w3c.github.io/IndexedDB/#ref-for-idbenvironment-1
+Window implements IDBEnvironment;

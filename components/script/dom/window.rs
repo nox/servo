@@ -26,6 +26,7 @@ use dom::cssstyledeclaration::{CSSModificationAccess, CSSStyleDeclaration};
 use dom::document::Document;
 use dom::element::Element;
 use dom::eventtarget::EventTarget;
+use dom::idbfactory::IDBFactory;
 use dom::location::Location;
 use dom::navigator::Navigator;
 use dom::node::{Node, from_untrusted_node_address, window_from_node};
@@ -266,6 +267,8 @@ pub struct Window {
 
     #[ignore_heap_size_of = "Defined in ipc-channel"]
     panic_chan: IpcSender<PanicMsg>,
+
+    indexeddb: MutNullableHeap<JS<IDBFactory>>,
 }
 
 impl Window {
@@ -864,6 +867,11 @@ impl WindowMethods for Window {
             Ok(_) => Ok(()),
             Err(e) => Err(Error::Type(format!("Couldn't open URL: {}", e))),
         }
+    }
+
+    // https://w3c.github.io/IndexedDB/#dom-idbenvironment-indexeddb
+    fn IndexedDB(&self) -> Root<IDBFactory> {
+        self.indexeddb.or_init(|| IDBFactory::new(GlobalRef::Window(self)))
     }
 }
 
@@ -1684,6 +1692,7 @@ impl Window {
             error_reporter: error_reporter,
             scroll_offsets: DOMRefCell::new(HashMap::new()),
             panic_chan: panic_chan,
+            indexeddb: Default::default(),
         };
 
         WindowBinding::Wrap(runtime.cx(), win)
