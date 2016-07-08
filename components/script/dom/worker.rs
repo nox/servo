@@ -5,7 +5,6 @@
 
 use dom::abstractworker::{SimpleWorkerErrorHandler, SharedRt, WorkerErrorHandler};
 use dom::abstractworker::{WorkerScriptLoadOrigin, WorkerScriptMsg};
-use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use dom::bindings::codegen::Bindings::WorkerBinding;
 use dom::bindings::codegen::Bindings::WorkerBinding::WorkerMethods;
 use dom::bindings::error::{Error, ErrorResult, Fallible};

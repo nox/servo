@@ -7,7 +7,6 @@ use devtools_traits::DevtoolScriptControlMsg;
 use dom::abstractworker::{WorkerScriptLoadOrigin, WorkerScriptMsg, SharedRt, SimpleWorkerErrorHandler};
 use dom::abstractworkerglobalscope::{SendableWorkerScriptChan, WorkerThreadWorkerChan};
 use dom::bindings::cell::DOMRefCell;
-use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use dom::bindings::codegen::Bindings::ServiceWorkerGlobalScopeBinding;
 use dom::bindings::codegen::Bindings::ServiceWorkerGlobalScopeBinding::ServiceWorkerGlobalScopeMethods;
 use dom::bindings::global::{GlobalRef, global_root_from_context};

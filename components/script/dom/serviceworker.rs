@@ -5,7 +5,6 @@
 use dom::abstractworker::{SimpleWorkerErrorHandler, WorkerErrorHandler};
 use dom::abstractworker::{WorkerScriptMsg, WorkerScriptLoadOrigin, SharedRt};
 use dom::bindings::cell::DOMRefCell;
-use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use dom::bindings::codegen::Bindings::ServiceWorkerBinding::{ServiceWorkerMethods, ServiceWorkerState, Wrap};
 use dom::bindings::global::GlobalRef;
 use dom::bindings::inheritance::Castable;
