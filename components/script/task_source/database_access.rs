@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use script_thread::{MainThreadScriptMsg, ScriptThread};
+use script_thread::{MainThreadScriptMsg, Runnable, ScriptThread};
 use std::result::Result;
 use std::sync::mpsc::Sender;
 use task_source::TaskSource;
@@ -17,11 +17,17 @@ impl TaskSource<DatabaseAccessTask> for DatabaseAccessTaskSource {
 }
 
 pub enum DatabaseAccessTask {
+    Runnable(Box<Runnable + Send>),
 }
 
 impl DatabaseAccessTask {
-    pub fn handle_task(self, _script_thread: &ScriptThread) {
+    pub fn handle_task(self, script_thread: &ScriptThread) {
         match self {
+            DatabaseAccessTask::Runnable(runnable) => {
+                if !runnable.is_cancelled() {
+                    runnable.main_thread_handler(script_thread);
+                }
+            }
         }
     }
 }

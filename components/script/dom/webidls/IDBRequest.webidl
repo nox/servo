@@ -5,13 +5,23 @@
 // https://w3c.github.io/IndexedDB/#idbrequest
 // [Exposed=(Window,Worker)]
 interface IDBRequest : EventTarget {
-  // readonly attribute any                                        result;
-  // readonly attribute DOMException                               error;
+  [Throws]
+  readonly attribute any                                        result;
+  // https://github.com/w3c/IndexedDB/pull/80
+  [Throws]
+  readonly attribute DOMException?                              error;
+
   // readonly attribute (IDBObjectStore or IDBIndex or IDBCursor)? source;
   // readonly attribute IDBTransaction                             transaction;
-  // readonly attribute IDBRequestReadyState                       readyState;
+
+  readonly attribute IDBRequestReadyState                       readyState;
 
   // Event handlers:
-  // attribute EventHandler onsuccess;
-  // attribute EventHandler onerror;
+  attribute EventHandler onsuccess;
+  attribute EventHandler onerror;
+};
+
+enum IDBRequestReadyState {
+    "pending",
+    "done"
 };

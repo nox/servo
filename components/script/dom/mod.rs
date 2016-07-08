@@ -341,6 +341,7 @@ pub mod htmltrackelement;
 pub mod htmlulistelement;
 pub mod htmlunknownelement;
 pub mod htmlvideoelement;
+pub mod idbdatabase;
 pub mod idbfactory;
 pub mod idbopendbrequest;
 pub mod idbrequest;
