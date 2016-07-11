@@ -24,6 +24,14 @@ pub fn default_data_dir() -> Option<PathBuf> {
     Some(PathBuf::from("/sdcard/servo"))
 }
 
+#[cfg(target_os = "macos")]
+pub fn default_data_dir() -> Option<PathBuf> {
+    let mut config_dir = env::home_dir().unwrap();
+    config_dir.push("Library");
+    config_dir.push("Servo");
+    Some(config_dir)
+}
+
 #[cfg(all(unix, not(target_os = "macos"), not(target_os = "ios"), not(target_os = "android")))]
 pub fn default_cache_dir() -> Option<PathBuf> {
     let xdg_dirs = xdg::BaseDirectories::with_profile("servo", "default").unwrap();
