@@ -32,8 +32,8 @@ impl LateLintPass for TransmutePass {
                             let tcx = cx.tcx;
                             cx.span_lint(TRANSMUTE_TYPE_LINT, ex.span,
                                          &format!("Transmute to {:?} from {:?} detected",
-                                                  tcx.expr_ty(ex),
-                                                  tcx.expr_ty(&**args.get(0).unwrap())
+                                                  tcx.tables().expr_ty(ex),
+                                                  tcx.tables().expr_ty(&args.get(0).unwrap())
                                         ));
                         }
                     }
