@@ -16,6 +16,7 @@ use dom::bindings::codegen::Bindings::DocumentBinding::{DocumentMethods, Documen
 use dom::bindings::codegen::Bindings::ElementBinding::ElementMethods;
 use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use dom::bindings::codegen::Bindings::EventHandlerBinding::OnErrorEventHandlerNonNull;
+use dom::bindings::codegen::Bindings::HTMLIFrameElementBinding::HTMLIFrameElementMethods;
 use dom::bindings::codegen::Bindings::NodeBinding::NodeMethods;
 use dom::bindings::codegen::Bindings::NodeFilterBinding::NodeFilter;
 use dom::bindings::codegen::Bindings::PerformanceBinding::PerformanceMethods;
@@ -107,7 +108,7 @@ use num_traits::ToPrimitive;
 use origin::Origin;
 use script_layout_interface::message::{Msg, ReflowQueryType};
 use script_runtime::{CommonScriptMsg, ScriptThreadEventCategory};
-use script_thread::{MainThreadScriptMsg, Runnable};
+use script_thread::{MainThreadScriptMsg, ScriptThread, Runnable};
 use script_traits::{AnimationState, CompositorEvent, MouseButton, MouseEventType, MozBrowserEvent};
 use script_traits::{ScriptMsg as ConstellationMsg, TouchpadPressurePhase};
 use script_traits::{TouchEventType, TouchId};
@@ -288,6 +289,12 @@ pub struct Document {
     last_click_info: DOMRefCell<Option<(Instant, Point2D<f32>)>>,
     /// https://html.spec.whatwg.org/multipage/#ignore-destructive-writes-counter
     ignore_destructive_writes_counter: Cell<u32>,
+    /// https://html.spec.whatwg.org/multipage/#ignore-opens-during-unload-counter
+    ignore_opens_during_unload_counter: Cell<u32>,
+    /// https://html.spec.whatwg.org/multipage/#concept-document-salvageable
+    salvageable: Cell<bool>,
+    /// https://html.spec.whatwg.org/multipage/#fired-unload
+    fired_unload: Cell<bool>,
     /// Track the total number of elements in this DOM's tree.
     /// This is sent to the layout thread every time a reflow is done;
     /// layout uses this to determine if the gains from parallel layout will be worth the overhead.
@@ -1732,6 +1739,165 @@ impl Document {
         // TODO: client message queue.
     }
 
+    // https://html.spec.whatwg.org/multipage/#prompt-to-unload-a-document
+    // For now, we never actually prompt.
+    pub fn prompt_to_unload(&self) {
+        // Step 1.
+        ScriptThread::increment_termination_nesting_level();
+
+        // Step 2.
+        self.increment_ignore_opens_during_unload_counter();
+
+        // Steps 3-4.
+        let event = BeforeUnloadEvent::new(&self.window,
+                                           atom!("beforeunload"),
+                                           EventBubbles::DoesNotBubble,
+                                           EventCancelable::Cancelable);
+
+        // Step 5.
+        event.upcast::<Event>().fire(self.window.upcast());
+
+        // Step 6.
+        ScriptThread::decrement_termination_nesting_level();
+
+        // Step 7.
+        // TODO: https://github.com/whatwg/html/issues/1900
+
+        // Step 8.
+        // TODO: active sandboxing flag.
+        // TODO: may ask the user to confirm unload.
+
+        // Steps 9-11.
+        // If the ignore-opens-during-loading counter is greater than 1, this
+        // means this algorithm was invoked recursively.
+        if self.ignore_opens_during_unload_counter.get() == 1 {
+            for iframe in self.iter_iframes() {
+                if let Some(document) = iframe.GetContentDocument() {
+                    // Step 11.1.
+                    document.prompt_to_unload();
+                    if !document.salvageable.get() {
+                        // Step 11.2.
+                        self.salvageable.set(false);
+                    }
+                }
+            }
+        }
+
+        // Step 12.
+        self.decrement_ignore_opens_during_unload_counter();
+    }
+
+    // https://html.spec.whatwg.org/multipage/#unload-a-document
+    pub fn unload(&self, recycle: bool) {
+        // Step 1.
+        ScriptThread::increment_termination_nesting_level();
+
+        // Step 2.
+        self.increment_ignore_opens_during_unload_counter();
+
+        // Steps 3-6.
+        // TODO: pagehide.
+
+        if !self.fired_unload.get() {
+            // Step 7.
+            self.window.upcast::<EventTarget>().fire_event(atom!("unload"));
+        }
+
+        // Step 8.
+        ScriptThread::decrement_termination_nesting_level();
+
+        // Step 9.
+        // TODO: https://github.com/whatwg/html/issues/1900
+        self.salvageable.set(true);
+        self.fired_unload.set(true);
+
+        // Step 10.
+        self.unloading_document_cleanup();
+
+        // Steps 11-13.
+        // If the ignore-opens-during-loading counter is greater than 1, this
+        // means this algorithm was invoked recursively.
+        if self.ignore_opens_during_unload_counter.get() == 1 {
+            for iframe in self.iter_iframes() {
+                if let Some(document) = iframe.GetContentDocument() {
+                    document.unload(false);
+                }
+            }
+        }
+
+        if !self.salvageable.get() && !recycle {
+            // Step 14.
+            self.discard();
+        }
+
+        // Step 15.
+        self.decrement_ignore_opens_during_unload_counter();
+    }
+
+    // https://html.spec.whatwg.org/multipage/#discard-a-document
+    fn discard(&self) {
+        // Step 1.
+        self.salvageable.set(false);
+
+        // Step 2.
+        self.unloading_document_cleanup();
+
+        // Step 3.
+        self.abort();
+
+        // Step 4.
+        // TODO: remove any tasks associated with the Document in any task source.
+
+        // Step 5.
+        for iframe in self.iter_iframes() {
+            if let Some(document) = iframe.GetContentDocument() {
+                // TODO: discard the browsing contexts themselves.
+                document.discard();
+            }
+        }
+
+        // Step 6.
+        // TODO: lose the strong reference from browsing context to the Document.
+    }
+
+    // https://html.spec.whatwg.org/multipage/#abort-a-document
+    fn abort(&self) {
+        // Step 1.
+        for iframe in self.iter_iframes() {
+            if let Some(document) = iframe.GetContentDocument() {
+                // TODO: abort the active documents of every child browsing context.
+                document.abort();
+                if !document.salvageable.get() {
+                    self.salvageable.set(false);
+                }
+            }
+        }
+
+        // Step 2.
+        // TODO: cancel any instances of the fetch algorithm in this Document.
+
+        // Step 3.
+        if let Some(parser) = self.get_current_parser() {
+            parser.abort();
+            self.salvageable.set(false);
+        }
+    }
+
+    // https://html.spec.whatwg.org/multipage/#unloading-document-cleanup-steps
+    fn unloading_document_cleanup(&self) {
+        // Step 1.
+        let _window = &self.window;
+
+        // Step 2.
+        // TODO: make websockets disappear.
+
+        if !self.salvageable.get() {
+            // Step 3.
+            // TODO: forcibly close eventsources.
+            // TODO: empty window's list of timers.
+        }
+    }
+
     pub fn notify_constellation_load(&self) {
         let global_scope = self.window.upcast::<GlobalScope>();
         let pipeline_id = global_scope.pipeline_id();
@@ -1975,6 +2141,9 @@ impl Document {
             target_element: MutNullableJS::new(None),
             last_click_info: DOMRefCell::new(None),
             ignore_destructive_writes_counter: Default::default(),
+            ignore_opens_during_unload_counter: Default::default(),
+            salvageable: Default::default(),
+            fired_unload: Default::default(),
             dom_count: Cell::new(1),
             fullscreen_element: MutNullableJS::new(None),
         }
@@ -2166,6 +2335,17 @@ impl Document {
     pub fn decr_ignore_destructive_writes_counter(&self) {
         self.ignore_destructive_writes_counter.set(
             self.ignore_destructive_writes_counter.get() - 1);
+    }
+
+    fn increment_ignore_opens_during_unload_counter(&self) {
+        let count_cell = &self.ignore_opens_during_unload_counter;
+        count_cell.set(count_cell.get() + 1);
+    }
+
+    fn decrement_ignore_opens_during_unload_counter(&self) {
+        let count_cell = &self.ignore_opens_during_unload_counter;
+        assert!(count_cell.get() > 0);
+        count_cell.set(count_cell.get() - 1);
     }
 
     // https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen
@@ -3236,6 +3416,70 @@ impl DocumentMethods for Document {
         elements
     }
 
+    // https://html.spec.whatwg.org/#opening-the-input-stream:dom-document-open-4
+    fn Open(&self, type_: DOMString, replace: DOMString) -> Fallible<Root<Document>> {
+        if !self.is_html_document() {
+            // Step 1.
+            return Err(Error::InvalidState);
+        }
+
+        // Step 2.
+        // TODO: handle throw-on-dynamic-markup-insertion counter.
+
+        // TODO: document needs to be active rather than fully active.
+        if !self.is_fully_active() {
+            // Step 3.
+            return Ok(Root::from_ref(self));
+        }
+
+        if self.origin.same_origin(&GlobalScope::entry().as_window().Document().origin) {
+            // Step 4.
+            return Err(Error::Security);
+        }
+
+        if self.get_current_parser().map_or(false, |parser| parser.script_nesting_level() > 0) {
+            // Step 5.
+            return Ok(Root::from_ref(self));
+        }
+
+        if self.ignore_opens_during_unload_counter.get() > 0 {
+            // Step 6.
+            return Ok(Root::from_ref(self));
+        }
+
+        // Step 7: first argument already bound to `type_`.
+
+        // Step 8.
+        // TODO: check session history's state.
+        let replace = replace.eq_ignore_ascii_case("replace");
+
+        // Step 9.
+        self.salvageable.set(false);
+
+        // Step 10.
+        self.prompt_to_unload();
+
+        // Step 11.
+        self.unload(true);
+
+        // Step 12.
+        self.abort();
+
+        // Step 13.
+        // TODO: unregister all event listeners registered on the Document node
+        // and its descendants.
+
+        // Step 14.
+        // TODO: remove any tasks associated with the Document in any task source.
+
+        // Step 15.
+        // TODO: remove all child nodes of the document, without firing any
+        // mutation events.
+
+        // Step 16.
+        unimplemented!();
+    }
+
     // https://html.spec.whatwg.org/multipage/#dom-document-write
     fn Write(&self, text: Vec<DOMString>) -> ErrorResult {
         if !self.is_html_document() {
@@ -3245,6 +3489,7 @@ impl DocumentMethods for Document {
 
         // Step 2.
         // TODO: handle throw-on-dynamic-markup-insertion counter.
+
         // FIXME: this should check for being active rather than fully active
         if !self.is_fully_active() {
             // Step 3.

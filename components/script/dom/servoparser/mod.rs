@@ -80,6 +80,8 @@ pub struct ServoParser {
     suspended: Cell<bool>,
     /// https://html.spec.whatwg.org/multipage/#script-nesting-level
     script_nesting_level: Cell<usize>,
+    /// https://html.spec.whatwg.org/multipage/#abort-a-parser
+    aborted: Cell<bool>,
 }
 
 #[derive(PartialEq)]
@@ -235,6 +237,26 @@ impl ServoParser {
         assert!(input.is_empty());
     }
 
+    // https://html.spec.whatwg.org/multipage/#abort-a-parser
+    pub fn abort(&self) {
+        assert!(!self.aborted.get());
+        self.aborted.set(true);
+
+        // Step 1.
+        *self.script_input.borrow_mut() = BufferQueue::new();
+        *self.network_input.borrow_mut() = BufferQueue::new();
+
+        // Step 2.
+        self.document.set_ready_state(DocumentReadyState::Interactive);
+
+        // Step 3.
+        self.tokenizer.borrow_mut().end();
+        self.document.set_current_parser(None);
+
+        // Step 4.
+        self.document.set_ready_state(DocumentReadyState::Interactive);
+    }
+
     #[allow(unrooted_must_root)]
     fn new_inherited(
             document: &Document,
@@ -252,6 +274,7 @@ impl ServoParser {
             last_chunk_received: Cell::new(last_chunk_state == LastChunkState::Received),
             suspended: Default::default(),
             script_nesting_level: Default::default(),
+            aborted: Default::default(),
         }
     }
 
@@ -317,6 +340,7 @@ impl ServoParser {
     {
         loop {
             assert!(!self.suspended.get());
+            assert!(!self.aborted.get());
 
             self.document.reflow_if_reflow_timer_expired();
             let script = match feed(&mut *self.tokenizer.borrow_mut()) {
@@ -481,6 +505,9 @@ impl FetchResponseListener for ParserContext {
             Some(parser) => parser,
             None => return,
         };
+        if parser.aborted.get() {
+            return;
+        }
 
         self.parser = Some(Trusted::new(&*parser));
 
@@ -537,15 +564,19 @@ impl FetchResponseListener for ParserContext {
     }
 
     fn process_response_chunk(&mut self, payload: Vec<u8>) {
-        if !self.is_synthesized_document {
-            // FIXME: use Vec<u8> (html5ever #34)
-            let data = UTF_8.decode(&payload, DecoderTrap::Replace).unwrap();
-            let parser = match self.parser.as_ref() {
-                Some(parser) => parser.root(),
-                None => return,
-            };
-            parser.parse_chunk(data);
+        if self.is_synthesized_document {
+            return;
         }
+        // FIXME: use Vec<u8> (html5ever #34)
+        let data = UTF_8.decode(&payload, DecoderTrap::Replace).unwrap();
+        let parser = match self.parser.as_ref() {
+            Some(parser) => parser.root(),
+            None => return,
+        };
+        if parser.aborted.get() {
+            return;
+        }
+        parser.parse_chunk(data);
     }
 
     fn process_response_eof(&mut self, status: Result<(), NetworkError>) {
@@ -553,6 +584,9 @@ impl FetchResponseListener for ParserContext {
             Some(parser) => parser.root(),
             None => return,
         };
+        if parser.aborted.get() {
+            return;
+        }
 
         if let Err(NetworkError::Internal(ref reason)) = status {
             // Show an error page for network errors,

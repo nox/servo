@@ -71,7 +71,7 @@ use script_layout_interface::rpc::{MarginStyleResponse, NodeScrollRootIdResponse
 use script_layout_interface::rpc::{ResolvedStyleResponse, TextIndexResponse};
 use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort, ScriptThreadEventCategory};
 use script_thread::{MainThreadScriptChan, MainThreadScriptMsg, Runnable, RunnableWrapper};
-use script_thread::SendableMainThreadScriptChan;
+use script_thread::{ScriptThread, SendableMainThreadScriptChan};
 use script_traits::{ConstellationControlMsg, LoadData, MozBrowserEvent, UntrustedNodeAddress};
 use script_traits::{DocumentState, TimerEvent, TimerEventId};
 use script_traits::{ScriptMsg as ConstellationMsg, TimerEventRequest, WindowSizeData, WindowSizeType};
@@ -418,6 +418,7 @@ impl WindowMethods for Window {
 
     // https://html.spec.whatwg.org/multipage/#dom-alert
     fn Alert(&self, s: DOMString) {
+
         // Right now, just print to the console
         // Ensure that stderr doesn't trample through the alert() we use to
         // communicate test results (see executorservo.py in wptrunner).
@@ -429,6 +430,10 @@ impl WindowMethods for Window {
             writeln!(&mut stdout, "ALERT: {}", s).unwrap();
             stdout.flush().unwrap();
             stderr.flush().unwrap();
+        }
+
+        if ScriptThread::termination_nesting_level() > 0 {
+            return;
         }
 
         let (sender, receiver) = ipc::channel().unwrap();
@@ -445,7 +450,15 @@ impl WindowMethods for Window {
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-window-close
+    // https://html.spec.whatwg.org/multipage/#close-a-browsing-context
     fn Close(&self) {
+        // TODO: responsible browsing context checks.
+        if !self.is_script_closable() {
+            return;
+        }
+        let document = self.Document();
+        document.prompt_to_unload();
+        document.unload(false);
         self.main_thread_script_chan()
             .send(MainThreadScriptMsg::ExitWindow(self.upcast::<GlobalScope>().pipeline_id()))
             .unwrap();
@@ -1547,6 +1560,13 @@ impl Window {
             Some((_, FrameType::IFrame)) => false,
             _ => true,
         }
+    }
+
+    // https://html.spec.whatwg.org/multipage/#script-closable
+    fn is_script_closable(&self) -> bool {
+        // TODO: auxiliary browsing context.
+        // TODO: session history contains only one document.
+        self.is_top_level()
     }
 
     // https://html.spec.whatwg.org/multipage/#parent-browsing-context

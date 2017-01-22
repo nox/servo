@@ -49,6 +49,7 @@ activate
 webglcontextcreationerror
 mouseover
 beforeunload
+unload
 message
 click
 keydown

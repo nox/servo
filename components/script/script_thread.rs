@@ -480,6 +480,9 @@ pub struct ScriptThread {
 
     /// A handle to the webvr thread, if available
     webvr_thread: Option<IpcSender<WebVRMsg>>,
+
+    /// https://html.spec.whatwg.org/multipage/#termination-nesting-level
+    termination_nesting_level: Cell<usize>,
 }
 
 /// In the event of thread panic, all data on the stack runs its destructor. However, there
@@ -621,6 +624,35 @@ impl ScriptThread {
         }))
     }
 
+    pub fn termination_nesting_level() -> usize {
+        SCRIPT_THREAD_ROOT.with(|root| {
+            root.get()
+                .map(|ptr| unsafe { &*ptr })
+                .map_or(0, |thread| thread.termination_nesting_level.get())
+        })
+    }
+
+    pub fn increment_termination_nesting_level() {
+        SCRIPT_THREAD_ROOT.with(|root| {
+            if let Some(script_thread) = root.get() {
+                let script_thread = unsafe { &*script_thread };
+                script_thread.termination_nesting_level.set(
+                    script_thread.termination_nesting_level.get() + 1);
+            }
+        })
+    }
+
+    pub fn decrement_termination_nesting_level() {
+        SCRIPT_THREAD_ROOT.with(|root| {
+            if let Some(script_thread) = root.get() {
+            let script_thread = unsafe { &*script_thread };
+                let level = script_thread.termination_nesting_level.get();
+                assert!(level > 0);
+                script_thread.termination_nesting_level.set(level + 1);
+            }
+        })
+    }
+
     /// Creates a new script thread.
     pub fn new(state: InitialScriptState,
                port: Receiver<MainThreadScriptMsg>,
@@ -696,7 +728,9 @@ impl ScriptThread {
 
             layout_to_constellation_chan: state.layout_to_constellation_chan,
 
-            webvr_thread: state.webvr_thread
+            webvr_thread: state.webvr_thread,
+
+            termination_nesting_level: Default::default(),
         }
     }
 
