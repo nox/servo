@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use darling::{self, FromMetaItem};
 use cg;
 use quote::Tokens;
 use syn::DeriveInput;
@@ -16,10 +17,17 @@ pub fn derive(input: DeriveInput) -> Tokens {
     let input_attrs = cg::parse_input_attrs::<CssInputAttrs>(&input);
     let style = synstructure::BindStyle::Ref.into();
     let match_body = synstructure::each_variant(&input, &style, |bindings, variant| {
-        let mut identifier = to_css_identifier(variant.ident.as_ref());
+        let identifier = to_css_identifier(variant.ident.as_ref());
         let variant_attrs = cg::parse_variant_attrs::<CssVariantAttrs>(variant);
         let separator = if variant_attrs.comma { ", " } else { " " };
-        let mut expr = if !bindings.is_empty() {
+        let mut expr =
+        if bindings.len() == 1 {
+            let binding = &bindings[0];
+            where_clause.add_trait_bound(&binding.field.ty);
+            quote! {
+                ::style_traits::values::ToCss::to_css(#binding, dest)
+            }
+        } else if !bindings.is_empty() {
             let mut expr = quote! {};
             for binding in bindings {
                 where_clause.add_trait_bound(&binding.field.ty);
@@ -38,7 +46,8 @@ pub fn derive(input: DeriveInput) -> Tokens {
                 ::std::fmt::Write::write_str(dest, #identifier)
             }
         };
-        if variant_attrs.function {
+        if let Some(function) = variant_attrs.function {
+            let mut identifier = function.name.unwrap_or(identifier);
             identifier.push_str("(");
             expr = quote! {
                 ::std::fmt::Write::write_str(dest, #identifier)?;
@@ -88,8 +97,25 @@ struct CssInputAttrs {
 #[darling(attributes(css), default)]
 #[derive(Default, FromVariant)]
 struct CssVariantAttrs {
-    function: bool,
+    function: Option<Function>,
     comma: bool,
+}
+
+#[derive(Default)]
+struct Function {
+    name: Option<String>,
+}
+
+impl FromMetaItem for Function {
+    fn from_string(value: &str) -> darling::Result<Self> {
+        Ok(Function {
+            name: Some(FromMetaItem::from_string(value)?),
+        })
+    }
+
+    fn from_word() -> darling::Result<Self> {
+        Ok(Default::default())
+    }
 }
 
 /// Transforms "FooBar" to "foo-bar".

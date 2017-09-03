@@ -631,7 +631,6 @@ ${helpers.predefined_type(
     use values::specified::{Angle, Integer, Length, LengthOrPercentage};
     use values::specified::{LengthOrNumber, LengthOrPercentageOrNumber as LoPoNumber, Number};
     use style_traits::ToCss;
-    use style_traits::values::Css;
 
     use std::fmt;
 
@@ -727,16 +726,19 @@ ${helpers.predefined_type(
     /// Multiple transform functions compose a transformation.
     ///
     /// Some transformations can be expressed by other more general functions.
-    #[derive(Clone, Debug, PartialEq)]
     #[cfg_attr(feature = "servo", derive(HeapSizeOf))]
+    #[derive(Clone, Debug, PartialEq, ToCss)]
     pub enum SpecifiedOperation {
         /// Represents a 2D 2x3 matrix.
+        #[css(function = "matrix")]
         Matrix(Matrix<Number>),
         /// Represents a 3D 4x4 matrix with percentage and length values.
         /// For `moz-transform`.
+        #[css(function = "matrix")]
         PrefixedMatrix(Matrix<Number, LoPoNumber>),
         /// Represents a 3D 4x4 matrix.
-        Matrix3D {
+        #[css(comma, function)]
+        Matrix3d {
             m11: Number, m12: Number, m13: Number, m14: Number,
             m21: Number, m22: Number, m23: Number, m24: Number,
             m31: Number, m32: Number, m33: Number, m34: Number,
@@ -744,7 +746,8 @@ ${helpers.predefined_type(
         },
         /// Represents a 3D 4x4 matrix with percentage and length values.
         /// For `moz-transform`.
-        PrefixedMatrix3D {
+        #[css(comma, function = "matrix3d")]
+        PrefixedMatrix3d {
             m11: Number,     m12: Number,     m13: Number,         m14: Number,
             m21: Number,     m22: Number,     m23: Number,         m24: Number,
             m31: Number,     m32: Number,     m33: Number,         m34: Number,
@@ -753,13 +756,21 @@ ${helpers.predefined_type(
         /// A 2D skew.
         ///
         /// If the second angle is not provided it is assumed zero.
+        #[css(comma, function)]
         Skew(Angle, Option<Angle>),
+        #[css(function = "skewX")]
         SkewX(Angle),
+        #[css(function = "skewY")]
         SkewY(Angle),
+        #[css(comma, function)]
         Translate(LengthOrPercentage, Option<LengthOrPercentage>),
+        #[css(function = "translateX")]
         TranslateX(LengthOrPercentage),
+        #[css(function = "translateY")]
         TranslateY(LengthOrPercentage),
+        #[css(function = "translateZ")]
         TranslateZ(Length),
+        #[css(comma, function = "translate3d")]
         Translate3D(LengthOrPercentage, LengthOrPercentage, Length),
         /// A 2D scaling factor.
         ///
@@ -767,112 +778,63 @@ ${helpers.predefined_type(
         /// writing `scale(2, 2)` (`Scale(Number::new(2.0), Some(Number::new(2.0)))`).
         ///
         /// Negative values are allowed and flip the element.
+        #[css(comma, function)]
         Scale(Number, Option<Number>),
+        #[css(function = "scaleX")]
         ScaleX(Number),
+        #[css(function = "scaleY")]
         ScaleY(Number),
+        #[css(function = "scaleZ")]
         ScaleZ(Number),
-        Scale3D(Number, Number, Number),
+        #[css(function)]
+        Scale3d(Number, Number, Number),
         /// Describes a 2D Rotation.
         ///
         /// In a 3D scene `rotate(angle)` is equivalent to `rotateZ(angle)`.
+        #[css(function)]
         Rotate(Angle),
         /// Rotation in 3D space around the x-axis.
+        #[css(function = "rotateX")]
         RotateX(Angle),
         /// Rotation in 3D space around the y-axis.
+        #[css(function = "rotateY")]
         RotateY(Angle),
         /// Rotation in 3D space around the z-axis.
+        #[css(function = "rotateZ")]
         RotateZ(Angle),
         /// Rotation in 3D space.
         ///
         /// Generalization of rotateX, rotateY and rotateZ.
-        Rotate3D(Number, Number, Number, Angle),
+        #[css(comma, function)]
+        Rotate3d(Number, Number, Number, Angle),
         /// Specifies a perspective projection matrix.
         ///
         /// Part of CSS Transform Module Level 2 and defined at
         /// [§ 13.1. 3D Transform Function](https://drafts.csswg.org/css-transforms-2/#funcdef-perspective).
         ///
         /// The value must be greater than or equal to zero.
+        #[css(function)]
         Perspective(specified::Length),
         /// A intermediate type for interpolation of mismatched transform lists.
-        InterpolateMatrix { from_list: SpecifiedValue,
-                            to_list: SpecifiedValue,
-                            progress: computed::Percentage },
+        #[css(comma, function = "interpolatematrix")]
+        InterpolateMatrix {
+            from_list: SpecifiedValue,
+            to_list: SpecifiedValue,
+            progress: computed::Percentage,
+        },
         /// A intermediate type for accumulation of mismatched transform lists.
-        AccumulateMatrix { from_list: SpecifiedValue,
-                           to_list: SpecifiedValue,
-                           count: Integer },
+        #[css(comma, function = "accumulatematrix")]
+        AccumulateMatrix {
+            from_list: SpecifiedValue,
+            to_list: SpecifiedValue,
+            count: Integer,
+        },
     }
 
     impl ToCss for computed_value::T {
         fn to_css<W>(&self, _: &mut W) -> fmt::Result where W: fmt::Write {
             // TODO(pcwalton)
             Ok(())
-        }
-    }
-
-    impl ToCss for SpecifiedOperation {
-        fn to_css<W>(&self, dest: &mut W) -> fmt::Result where W: fmt::Write {
-            match *self {
-                SpecifiedOperation::Matrix(ref m) => m.to_css(dest),
-                SpecifiedOperation::PrefixedMatrix(ref m) => m.to_css(dest),
-                SpecifiedOperation::Matrix3D {
-                    m11, m12, m13, m14,
-                    m21, m22, m23, m24,
-                    m31, m32, m33, m34,
-                    m41, m42, m43, m44 } => write!(
-                        dest, "matrix3d({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
-                        Css(m11), Css(m12), Css(m13), Css(m14),
-                        Css(m21), Css(m22), Css(m23), Css(m24),
-                        Css(m31), Css(m32), Css(m33), Css(m34),
-                        Css(m41), Css(m42), Css(m43), Css(m44)),
-                SpecifiedOperation::PrefixedMatrix3D {
-                    m11, m12, m13, m14,
-                    m21, m22, m23, m24,
-                    m31, m32, m33, m34,
-                    ref m41, ref m42, ref m43, m44 } => write!(
-                        dest, "matrix3d({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})",
-                        Css(m11), Css(m12), Css(m13), Css(m14),
-                        Css(m21), Css(m22), Css(m23), Css(m24),
-                        Css(m31), Css(m32), Css(m33), Css(m34),
-                        Css(m41), Css(m42), Css(m43), Css(m44)),
-                SpecifiedOperation::Skew(ax, None) => write!(dest, "skew({})", Css(ax)),
-                SpecifiedOperation::Skew(ax, Some(ay)) => write!(dest, "skew({}, {})", Css(ax), Css(ay)),
-                SpecifiedOperation::SkewX(angle) => write!(dest, "skewX({})", Css(angle)),
-                SpecifiedOperation::SkewY(angle) => write!(dest, "skewY({})", Css(angle)),
-                SpecifiedOperation::Translate(ref tx, None) => write!(dest, "translate({})", Css(tx)),
-                SpecifiedOperation::Translate(ref tx, Some(ref ty)) => {
-                    write!(dest, "translate({}, {})", Css(tx), Css(ty))
-                },
-                SpecifiedOperation::TranslateX(ref tx) => write!(dest, "translateX({})", Css(tx)),
-                SpecifiedOperation::TranslateY(ref ty) => write!(dest, "translateY({})", Css(ty)),
-                SpecifiedOperation::TranslateZ(ref tz) => write!(dest, "translateZ({})", Css(tz)),
-                SpecifiedOperation::Translate3D(ref tx, ref ty, ref tz) => write!(
-                    dest, "translate3d({}, {}, {})", Css(tx), Css(ty), Css(tz)),
-                SpecifiedOperation::Scale(factor, None) => write!(dest, "scale({})", Css(factor)),
-                SpecifiedOperation::Scale(sx, Some(sy)) => write!(dest, "scale({}, {})", Css(sx), Css(sy)),
-                SpecifiedOperation::ScaleX(sx) => write!(dest, "scaleX({})", Css(sx)),
-                SpecifiedOperation::ScaleY(sy) => write!(dest, "scaleY({})", Css(sy)),
-                SpecifiedOperation::ScaleZ(sz) => write!(dest, "scaleZ({})", Css(sz)),
-                SpecifiedOperation::Scale3D(sx, sy, sz) => {
-                    write!(dest, "scale3d({}, {}, {})", Css(sx), Css(sy), Css(sz))
-                },
-                SpecifiedOperation::Rotate(theta) => write!(dest, "rotate({})", Css(theta)),
-                SpecifiedOperation::RotateX(theta) => write!(dest, "rotateX({})", Css(theta)),
-                SpecifiedOperation::RotateY(theta) => write!(dest, "rotateY({})", Css(theta)),
-                SpecifiedOperation::RotateZ(theta) => write!(dest, "rotateZ({})", Css(theta)),
-                SpecifiedOperation::Rotate3D(x, y, z, theta) => write!(
-                    dest, "rotate3d({}, {}, {}, {})",
-                    Css(x), Css(y), Css(z), Css(theta)),
-                SpecifiedOperation::Perspective(ref length) => write!(dest, "perspective({})", Css(length)),
-                SpecifiedOperation::InterpolateMatrix { ref from_list, ref to_list, progress } => {
-                    write!(dest, "interpolatematrix({}, {}, {})",
-                           Css(from_list), Css(to_list), Css(progress))
-                },
-                SpecifiedOperation::AccumulateMatrix { ref from_list, ref to_list, count } => {
-                    write!(dest, "accumulatematrix({}, {}, {})",
-                           Css(from_list), Css(to_list), Css(count))
-                }
-            }
         }
     }
 
@@ -977,7 +939,7 @@ ${helpers.predefined_type(
                             let m43 = specified::parse_number(context, input)?;
                             input.expect_comma()?;
                             let m44 = specified::parse_number(context, input)?;
-                            Ok(SpecifiedOperation::Matrix3D {
+                            Ok(SpecifiedOperation::Matrix3d {
                                 m11, m12, m13, m14,
                                 m21, m22, m23, m24,
                                 m31, m32, m33, m34,
@@ -992,7 +954,7 @@ ${helpers.predefined_type(
                             let m43 = LengthOrNumber::parse(context, input)?;
                             input.expect_comma()?;
                             let m44 = specified::parse_number(context, input)?;
-                            Ok(SpecifiedOperation::PrefixedMatrix3D {
+                            Ok(SpecifiedOperation::PrefixedMatrix3d {
                                 m11, m12, m13, m14,
                                 m21, m22, m23, m24,
                                 m31, m32, m33, m34,
@@ -1056,7 +1018,7 @@ ${helpers.predefined_type(
                         let sy = specified::parse_number(context, input)?;
                         input.expect_comma()?;
                         let sz = specified::parse_number(context, input)?;
-                        Ok(SpecifiedOperation::Scale3D(sx, sy, sz))
+                        Ok(SpecifiedOperation::Scale3d(sx, sy, sz))
                     },
                     "rotate" => {
                         let theta = specified::Angle::parse_with_unitless(context, input)?;
@@ -1083,7 +1045,7 @@ ${helpers.predefined_type(
                         input.expect_comma()?;
                         let theta = specified::Angle::parse_with_unitless(context, input)?;
                         // TODO(gw): Check that the axis can be normalized.
-                        Ok(SpecifiedOperation::Rotate3D(ax, ay, az, theta))
+                        Ok(SpecifiedOperation::Rotate3d(ax, ay, az, theta))
                     },
                     "skew" => {
                         let ax = specified::Angle::parse_with_unitless(context, input)?;
@@ -1161,7 +1123,7 @@ ${helpers.predefined_type(
                         comp.m42 = lopon_to_lop(&f.to_computed_value(context));
                         result.push(computed_value::ComputedOperation::MatrixWithPercents(comp));
                     }
-                    SpecifiedOperation::Matrix3D {
+                    SpecifiedOperation::Matrix3d {
                         m11, m12, m13, m14,
                         m21, m22, m23, m24,
                         m31, m32, m33, m34,
@@ -1186,7 +1148,7 @@ ${helpers.predefined_type(
                             };
                         result.push(computed_value::ComputedOperation::Matrix(comp));
                     }
-                    SpecifiedOperation::PrefixedMatrix3D {
+                    SpecifiedOperation::PrefixedMatrix3d {
                         m11, m12, m13, m14,
                         m21, m22, m23, m24,
                         m31, m32, m33, m34,
@@ -1274,7 +1236,7 @@ ${helpers.predefined_type(
                         let sz = sz.to_computed_value(context);
                         result.push(computed_value::ComputedOperation::Scale(1.0, 1.0, sz));
                     }
-                    SpecifiedOperation::Scale3D(sx, sy, sz) => {
+                    SpecifiedOperation::Scale3d(sx, sy, sz) => {
                         let sx = sx.to_computed_value(context);
                         let sy = sy.to_computed_value(context);
                         let sz = sz.to_computed_value(context);
@@ -1296,7 +1258,7 @@ ${helpers.predefined_type(
                         let theta = theta.to_computed_value(context);
                         result.push(computed_value::ComputedOperation::Rotate(0.0, 0.0, 1.0, theta));
                     }
-                    SpecifiedOperation::Rotate3D(ax, ay, az, theta) => {
+                    SpecifiedOperation::Rotate3d(ax, ay, az, theta) => {
                         let ax = ax.to_computed_value(context);
                         let ay = ay.to_computed_value(context);
                         let az = az.to_computed_value(context);
@@ -1350,7 +1312,7 @@ ${helpers.predefined_type(
                 for operation in computed {
                     match *operation {
                         computed_value::ComputedOperation::Matrix(ref computed) => {
-                            result.push(SpecifiedOperation::Matrix3D {
+                            result.push(SpecifiedOperation::Matrix3d {
                                 m11: Number::from_computed_value(&computed.m11),
                                 m12: Number::from_computed_value(&computed.m12),
                                 m13: Number::from_computed_value(&computed.m13),
@@ -1370,7 +1332,7 @@ ${helpers.predefined_type(
                             });
                         }
                         computed_value::ComputedOperation::MatrixWithPercents(ref computed) => {
-                            result.push(SpecifiedOperation::PrefixedMatrix3D {
+                            result.push(SpecifiedOperation::PrefixedMatrix3d {
                                 m11: Number::from_computed_value(&computed.m11),
                                 m12: Number::from_computed_value(&computed.m12),
                                 m13: Number::from_computed_value(&computed.m13),
@@ -1398,13 +1360,13 @@ ${helpers.predefined_type(
                                               ToComputedValue::from_computed_value(tz)));
                         }
                         computed_value::ComputedOperation::Scale(ref sx, ref sy, ref sz) => {
-                            result.push(SpecifiedOperation::Scale3D(
+                            result.push(SpecifiedOperation::Scale3d(
                                     Number::from_computed_value(sx),
                                     Number::from_computed_value(sy),
                                     Number::from_computed_value(sz)));
                         }
                         computed_value::ComputedOperation::Rotate(ref ax, ref ay, ref az, ref theta) => {
-                            result.push(SpecifiedOperation::Rotate3D(
+                            result.push(SpecifiedOperation::Rotate3d(
                                     Number::from_computed_value(ax),
                                     Number::from_computed_value(ay),
                                     Number::from_computed_value(az),
