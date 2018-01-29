@@ -2690,6 +2690,12 @@ impl PartialEq for %(name)s {
         self as *const %(name)s == &*other
     }
 }
+
+impl AsRef<%(name)s> for %(name)s {
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
 """ % {'check': check, 'name': name}
 
 

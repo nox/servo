@@ -20,6 +20,7 @@ use dom::permissionstatus::PermissionStatus;
 use dom::promise::Promise;
 use dom_struct::dom_struct;
 use ipc_channel::ipc::IpcSender;
+use std::cell::RefMut;
 use std::rc::Rc;
 
 // https://webbluetoothcg.github.io/web-bluetooth/#bluetoothpermissionresult
@@ -66,9 +67,14 @@ impl BluetoothPermissionResult {
         self.status.State()
     }
 
-    #[allow(unrooted_must_root)]
-    pub fn set_devices(&self, devices: Vec<Dom<BluetoothDevice>>) {
-        *self.devices.borrow_mut() = devices;
+    pub fn devices_mut(&self) -> RefMut<Vec<Dom<BluetoothDevice>>> {
+        self.devices.borrow_mut()
+    }
+
+    fn set_single_device(&self, device: &BluetoothDevice) {
+        let mut devices = self.devices.borrow_mut();
+        devices.clear();
+        devices.push(Dom::from_ref(device));
     }
 }
 
@@ -93,7 +99,7 @@ impl AsyncBluetoothListener for BluetoothPermissionResult {
                 if let Some(ref existing_device) = device_instance_map.get(&device.id) {
                     // https://webbluetoothcg.github.io/web-bluetooth/#request-the-bluetooth-permission
                     // Step 3.
-                    self.set_devices(vec!(Dom::from_ref(&*existing_device)));
+                    self.set_single_device(&existing_device);
 
                     // https://w3c.github.io/permissions/#dom-permissions-request
                     // Step 8.
@@ -112,7 +118,7 @@ impl AsyncBluetoothListener for BluetoothPermissionResult {
                 );
                 // https://webbluetoothcg.github.io/web-bluetooth/#request-the-bluetooth-permission
                 // Step 3.
-                self.set_devices(vec!(Dom::from_ref(&bt_device)));
+                self.set_single_device(&bt_device);
 
                 // https://w3c.github.io/permissions/#dom-permissions-request
                 // Step 8.

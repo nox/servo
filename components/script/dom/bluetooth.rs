@@ -36,6 +36,7 @@ use js::jsapi::{JSContext, JSObject};
 use js::jsval::{ObjectValue, UndefinedValue};
 use std::cell::Ref;
 use std::collections::HashMap;
+use std::mem;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -574,7 +575,7 @@ impl PermissionAlgorithm for Bluetooth {
 
         // Step 3.
         if let PermissionState::Denied = status.get_state() {
-            status.set_devices(Vec::new());
+            status.devices_mut().clear();
             return promise.resolve_native(status);
         }
 
@@ -635,7 +636,7 @@ impl PermissionAlgorithm for Bluetooth {
         }
 
         // Step 7.
-        status.set_devices(matching_devices.drain(..).collect());
+        mem::swap(&mut *matching_devices, &mut *status.devices_mut());
 
         // https://w3c.github.io/permissions/#dom-permissions-query
         // Step 7.
