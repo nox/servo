@@ -92,6 +92,7 @@ use std::cell::{Cell, RefCell, UnsafeCell};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::hash::{BuildHasher, Hash};
 use std::ops::{Deref, DerefMut};
+use std::mem;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -845,6 +846,22 @@ impl<'a, T: 'static + JSTraceable> RootedVec<'a, T> {
             root: root,
         }
     }
+
+    pub fn clear(&mut self) {
+        self.root.v.clear();
+    }
+
+    pub fn swap(&mut self, other: &mut Vec<T>) {
+        mem::swap(&mut self.root.v, other);
+    }
+
+    pub fn pop(&mut self) {
+        self.root.v.pop();
+    }
+
+    pub fn append_to(&mut self, dest: &mut Vec<T>) {
+        dest.append(&mut self.root.v);
+    }
 }
 
 impl<'a, T: 'static + JSTraceable + DomObject> RootedVec<'a, Dom<T>> {
@@ -861,6 +878,10 @@ impl<'a, T: 'static + JSTraceable + DomObject> RootedVec<'a, Dom<T>> {
             root: root,
         }
     }
+
+    pub fn push_ref(&mut self, value: &T) {
+        self.root.v.push(Dom::from_ref(value));
+    }
 }
 
 impl<'a, T: JSTraceable + 'static> Drop for RootedVec<'a, T> {
@@ -876,12 +897,6 @@ impl<'a, T: JSTraceable> Deref for RootedVec<'a, T> {
     type Target = Vec<T>;
     fn deref(&self) -> &Vec<T> {
         &self.root.v
-    }
-}
-
-impl<'a, T: JSTraceable> DerefMut for RootedVec<'a, T> {
-    fn deref_mut(&mut self) -> &mut Vec<T> {
-        &mut self.root.v
     }
 }
 

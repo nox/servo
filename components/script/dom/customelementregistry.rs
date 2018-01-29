@@ -35,7 +35,6 @@ use microtask::Microtask;
 use script_thread::ScriptThread;
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
-use std::mem;
 use std::ops::Deref;
 use std::ptr;
 use std::rc::Rc;
@@ -649,15 +648,16 @@ impl CustomElementReactionStack {
 
     pub fn pop_current_element_queue(&self) {
         rooted_vec!(let mut stack);
-        mem::swap(&mut *stack, &mut *self.stack.borrow_mut());
+        stack.swap(&mut *self.stack.borrow_mut());
 
         if let Some(current_queue) = stack.last() {
             current_queue.invoke_reactions();
         }
         stack.pop();
 
-        mem::swap(&mut *self.stack.borrow_mut(), &mut *stack);
-        self.stack.borrow_mut().append(&mut *stack);
+        let mut self_stack = self.stack.borrow_mut();
+        stack.swap(&mut *self_stack);
+        stack.append_to(&mut self_stack);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#enqueue-an-element-on-the-appropriate-element-queue>

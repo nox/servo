@@ -36,7 +36,6 @@ use js::jsapi::{JSContext, JSObject};
 use js::jsval::{ObjectValue, UndefinedValue};
 use std::cell::Ref;
 use std::collections::HashMap;
-use std::mem;
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -631,12 +630,12 @@ impl PermissionAlgorithm for Bluetooth {
             // TODO: Implement this correctly, not just using device ids here.
             // https://webbluetoothcg.github.io/web-bluetooth/#get-the-bluetoothdevice-representing
             if let Some(device) = device_map.get(&device_id) {
-                matching_devices.push(Dom::from_ref(&**device));
+                matching_devices.push_ref(&**device);
             }
         }
 
         // Step 7.
-        mem::swap(&mut *matching_devices, &mut *status.devices_mut());
+        matching_devices.swap(&mut *status.devices_mut());
 
         // https://w3c.github.io/permissions/#dom-permissions-query
         // Step 7.
