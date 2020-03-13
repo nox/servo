@@ -9,6 +9,7 @@
 #[macro_use]
 extern crate serde;
 
+mod cell;
 pub mod context;
 pub mod data;
 pub mod display_list;
